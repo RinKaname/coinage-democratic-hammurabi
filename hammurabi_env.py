@@ -14,12 +14,12 @@ class DemocraticHammurabi:
     def reset(self):
         self.year = 1
         self.population = 300
-        self.grain = 3000            # Bushels of food & seed in silos
-        self.land = 1000             # Acres of farmable land
+        self.grain = 6000            # Bushels of food & seed in silos
+        self.land = 2500             # Acres of farmable land
         self.silver = 30000           # Silver shekels in royal vault (rats cannot eat silver!)
-        self.elite_pop = int(self.population * 0.15)
-        self.worker_pop = int(self.population * 0.5)
-        self.farmer_pop = int(self.population * 0.35)
+        self.elite_pop = int(self.population * 0.05)
+        self.worker_pop = int(self.population * 0.15)
+        self.farmer_pop = int(self.population * 0.80)
 
         self.civilian_grain = 5000
 
@@ -45,11 +45,11 @@ class DemocraticHammurabi:
         return self._get_state()
 
     def update_demographics_and_prices(self):
-        self.elite_pop = int(self.population * 0.15)
-        self.farmer_pop = int(self.population * 0.35)
+        self.elite_pop = int(self.population * 0.05)
+        self.farmer_pop = int(self.population * 0.80)
         self.worker_pop = self.population - self.elite_pop - self.farmer_pop
 
-        self.land_demand = float(self.elite_pop * 40) + float(self.farmer_pop * 15) + float(self.worker_pop * 2)
+        self.land_demand = float(self.elite_pop * 20) + float(self.farmer_pop * 10) + float(self.worker_pop * 1)
 
         # Deterministic land price
         base_land_price = 25.0
@@ -204,8 +204,8 @@ class DemocraticHammurabi:
 
         harvest = actual_planted * yield_per_acre
 
-        # 20% Tax goes to king, rest to economy
-        king_tax = int(harvest * 0.2)
+        # 40% Tax goes to king (since King funds 100% of seeds and feeds 15% state workers)
+        king_tax = int(harvest * 0.4)
         civilian_harvest = harvest - king_tax
 
         self.grain += king_tax

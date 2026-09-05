@@ -143,7 +143,7 @@ def play():
         # ----------------------------------------------------------------------
         # Decision 3: Feed Workers (from Silo Grain)
         # ----------------------------------------------------------------------
-        worker_pop = pop - int(pop * 0.15) - int(pop * 0.35)
+        worker_pop = pop - int(pop * 0.05) - int(pop * 0.80)
         needed_food = worker_pop * 20
         print(f"\n3. FEEDING WORKERS (Silos available: {grain_after_trade:,} bushels)")
         print(f"   Workers to feed: {worker_pop:,} | Needed: {needed_food:,} bushels (20 bu/person)")
@@ -172,7 +172,7 @@ def play():
         # ----------------------------------------------------------------------
         # Decision 4: Planting Seeds (from remaining grain)
         # ----------------------------------------------------------------------
-        farmer_pop = int(pop * 0.35)
+        farmer_pop = int(pop * 0.80)
         land_after_trade = land + acres_trade
         max_workable = farmer_pop * 10
         max_plantable = min(land_after_trade, max_workable, grain_after_food)

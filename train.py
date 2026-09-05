@@ -110,7 +110,7 @@ class DiscreteHammurabiEnv:
             grain_after_trade = current_grain
 
         # 2. Food allocation (Worker Only)
-        worker_pop = self.env.population - int(self.env.population * 0.15) - int(self.env.population * 0.35)
+        worker_pop = self.env.population - int(self.env.population * 0.05) - int(self.env.population * 0.80)
         food_needed = worker_pop * 20
         target_food = min(grain_after_trade, food_needed * FEED_MULTIPLIERS[feed_idx])
         action_feed = target_food / max(1.0, grain_after_trade)
@@ -118,7 +118,7 @@ class DiscreteHammurabiEnv:
         # 3. Planting allocation (calculated on REMAINING grain after food!)
         # Only farmers can plant
         grain_after_food = max(0.0, grain_after_trade - target_food)
-        farmer_pop = int(self.env.population * 0.35)
+        farmer_pop = int(self.env.population * 0.80)
         max_workable = farmer_pop * 10
         target_plant = min(float(self.env.land), float(max_workable)) * PLANT_MULTIPLIERS[plant_idx]
         action_plant = min(1.0, target_plant / max(1.0, grain_after_food))
