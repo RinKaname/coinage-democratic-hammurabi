@@ -20,14 +20,15 @@ class DemocraticHammurabi:
         self.elite_pop = int(self.population * 0.15)
         self.worker_pop = int(self.population * 0.5)
         self.farmer_pop = int(self.population * 0.35)
-        self.land_demand = float(self.elite_pop * 40) + float(self.farmer_pop * 15) + float(self.worker_pop * 2)
+
+        self.civilian_grain = 5000
+
+        self.update_demographics_and_prices()
+        self.update_grain_price()
+
         # Dynamic wealth baseline
         self.initial_pop = self.population
-        self.initial_wealth = self.silver + (self.land * 25) + int(self.grain * 1.0)
-
-        # Market prices
-        self.land_price = random.randint(20, 30)                # Silver per acre
-        self.grain_price = round(random.uniform(0.9, 1.2), 2)  # Silver per bushel
+        self.initial_wealth = self.silver + (self.land * self.land_price) + int(self.grain * self.grain_price)
 
         # Faction approvals (0 to 100)
         self.farmers_approval = 50.0
@@ -42,6 +43,26 @@ class DemocraticHammurabi:
         self.last_immigrants = 0
 
         return self._get_state()
+
+    def update_demographics_and_prices(self):
+        self.elite_pop = int(self.population * 0.15)
+        self.farmer_pop = int(self.population * 0.35)
+        self.worker_pop = self.population - self.elite_pop - self.farmer_pop
+
+        self.land_demand = float(self.elite_pop * 40) + float(self.farmer_pop * 15) + float(self.worker_pop * 2)
+
+        # Deterministic land price
+        base_land_price = 25.0
+        raw_land_price = base_land_price * (self.land_demand / max(1.0, float(self.land)))
+        self.land_price = float(max(10.0, min(100.0, raw_land_price)))
+
+    def update_grain_price(self):
+        total_supply = float(self.grain + getattr(self, "civilian_grain", 0))
+        total_demand = float(self.population * 20)
+
+        # Deterministic Grain Price based on overall supply vs demand
+        raw_grain_price = 1.0 * (total_demand / max(1.0, total_supply))
+        self.grain_price = float(max(0.5, min(5.0, raw_grain_price)))
 
     def _get_state(self):
         years_until_election = 4 - (self.year % 4)
@@ -124,17 +145,40 @@ class DemocraticHammurabi:
             grain_traded = bushels_to_buy
 
         # ----------------------------------------------------------------------
-        # 3. Feed Citizens (from Silo Grain)
+        # 3. Feed Workers (from Silo Grain)
         # ----------------------------------------------------------------------
         grain_for_food = int(action_feed * self.grain)
         self.grain -= grain_for_food
 
-        people_fed = grain_for_food // 20
-        starved = max(0, self.population - people_fed)
+        workers_fed = grain_for_food // 20
+        workers_starved = max(0, self.worker_pop - workers_fed)
+
+        # Elites and Farmers feed themselves from civilian grain, but can starve if prices are too high
+        # We calculate the food demand for all non-workers and see if they survive
+        civilian_food_demand = (self.elite_pop + self.farmer_pop) * 20
+
+        total_supply = float(self.grain + self.civilian_grain)
+        total_demand = float(self.population * 20)
+
+        # Deterministic Grain Price based on overall supply vs demand
+        raw_grain_price = 1.0 * (total_demand / max(1.0, total_supply))
+        self.grain_price = float(max(0.5, min(5.0, raw_grain_price)))
+
+        # If grain price is too high (> 2.0), civilian starvation occurs
+        civilians_starved = 0
+        if self.grain_price > 2.0:
+            starvation_rate = min(0.5, (self.grain_price - 2.0) * 0.1) # Up to 50% starve if price is 7.0
+            civilians_starved = int((self.elite_pop + self.farmer_pop) * starvation_rate)
+
+        # Civilians eat their grain (if available)
+        self.civilian_grain = max(0, self.civilian_grain - civilian_food_demand)
+
+        starved = workers_starved + civilians_starved
         self.starved_total = starved
 
         if starved > 0:
             self.population -= starved
+            self.update_demographics_and_prices()
 
         # Immediate impeachment if starvation exceeds 45%
         if starved > 0.45 * (self.population + starved):
@@ -143,25 +187,35 @@ class DemocraticHammurabi:
             return self._get_state(), self._calculate_reward(), self.is_done, {"reason": self.game_over_reason}
 
         # ----------------------------------------------------------------------
-        # 4. Planting Seeds (1 bushel per acre, max 10 acres per citizen)
+        # 4. Planting Seeds (1 bushel per acre, max 10 acres per farmer)
         # ----------------------------------------------------------------------
         grain_for_planting = int(action_plant * self.grain)
-        max_workable_by_people = self.population * 10
+        max_workable_by_people = self.farmer_pop * 10
         actual_planted = min(grain_for_planting, self.land, max_workable_by_people)
         self.grain -= actual_planted
 
         # ----------------------------------------------------------------------
         # 5. Harvest & Rats
         # ----------------------------------------------------------------------
-        yield_per_acre = random.randint(1, 5)
+        # Deterministic 4-year cycle (e.g., 3, 4, 2, 5)
+        yield_cycle = [3, 4, 2, 5]
+        yield_per_acre = yield_cycle[(self.year - 1) % 4]
         self.last_harvest_yield = yield_per_acre
+
         harvest = actual_planted * yield_per_acre
-        self.grain += harvest
+
+        # 20% Tax goes to king, rest to economy
+        king_tax = int(harvest * 0.2)
+        civilian_harvest = harvest - king_tax
+
+        self.grain += king_tax
+        self.civilian_grain += civilian_harvest
 
         # Rats eat grain (Silver is 100% safe in vaults!)
+        # Deterministic: Rats appear if grain silos are very full (> 5000)
         rats_ate = 0
-        if random.random() < 0.4:  # 40% chance of rats
-            rats_ate = int(self.grain * random.uniform(0.1, 0.3))
+        if self.grain > 5000:
+            rats_ate = int(self.grain * 0.2) # Rats eat 20% of the hoard
             self.grain -= rats_ate
         self.last_rats_ate = rats_ate
 
@@ -172,11 +226,9 @@ class DemocraticHammurabi:
         if starved == 0:
             # Prosperity brings merchants and settlers
             wealth_factor = (20 * self.land + self.grain + self.silver) / (100 * self.population + 1)
-            immigrants = random.randint(1, 10) + int(wealth_factor)
+            immigrants = 5 + int(wealth_factor) # Deterministic immigrants
             self.population += immigrants
-            self.elite_pop = int(self.population * 0.15)
-            self.farmer_pop = int(self.population * 0.35)
-            self.worker_pop = self.population - self.elite_pop - self.farmer_pop
+            self.update_demographics_and_prices()
 
         self.last_immigrants = immigrants
 
@@ -190,10 +242,12 @@ class DemocraticHammurabi:
             self.farmers_approval -= 10
         if actual_planted == self.land:
             self.farmers_approval += 5
+        if civilians_starved > 0:
+             self.farmers_approval -= 20
 
         # Workers: Hate starvation, love low food prices and full bellies
-        if starved > 0:
-            self.workers_approval -= (starved / self.population) * 100
+        if workers_starved > 0:
+            self.workers_approval -= (workers_starved / max(1, self.worker_pop)) * 100
         else:
             self.workers_approval += 5
 
@@ -224,18 +278,8 @@ class DemocraticHammurabi:
         # 9. Next Year Market Price Fluctuations
         # ----------------------------------------------------------------------
         self.year += 1
-        self.land_price = random.randint(20, 30)
-
-        # Grain price responds dynamically to harvest yield & scarcity
-        if yield_per_acre <= 2 or rats_ate > 0:
-            # Famine / Scarcity spikes grain prices!
-            self.grain_price = round(random.uniform(1.3, 2.0), 2)
-        elif yield_per_acre >= 4:
-            # Bumper harvest lowers grain prices
-            self.grain_price = round(random.uniform(0.7, 0.95), 2)
-        else:
-            # Normal harvest
-            self.grain_price = round(random.uniform(0.95, 1.25), 2)
+        self.update_demographics_and_prices()
+        self.update_grain_price()
 
         if self.year > self.max_years:
             self.is_done = True
