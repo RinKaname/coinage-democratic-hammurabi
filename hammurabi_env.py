@@ -276,8 +276,7 @@ class DemocraticHammurabi:
         # 8. Democratic Elections (Every 4 years)
         # ----------------------------------------------------------------------
         if self.year % 4 == 0:
-            total_voters = self.farmer_pop + self.worker_pop + self.elite_pop
-            average_approval = ((self.farmer_pop * self.farmers_approval) + (self.worker_pop * self.workers_approval) + (self.elite_pop * self.elites_approval)) / total_voters
+            average_approval = self.get_average_approval()
             if average_approval < 45.0:
                 self.is_done = True
                 self.game_over_reason = f"Lost election with {average_approval:.1f}% approval"
@@ -300,6 +299,13 @@ class DemocraticHammurabi:
             "rats_ate": rats_ate,
             "immigrants": immigrants,
         }
+
+    def get_average_approval(self):
+        total_voters = max(1, self.farmer_pop + self.worker_pop + self.elite_pop)
+        average_approval = ((self.farmer_pop * self.farmers_approval) +
+                            (self.worker_pop * self.workers_approval) +
+                            (self.elite_pop * self.elites_approval)) / total_voters
+        return average_approval
 
     def _clamp_and_decay_approval(self, approval):
         if approval > 50:

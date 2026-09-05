@@ -51,7 +51,7 @@ def play():
         f_appr = env.farmers_approval
         w_appr = env.workers_approval
         e_appr = env.elites_approval
-        avg_appr = (f_appr + w_appr + e_appr) / 3.0
+        avg_appr = env.get_average_approval()
         yrs_to_election = 4 - (year % 4) if (year % 4) != 0 else 0
 
         print(f"\n" + "-" * 70)
@@ -242,7 +242,7 @@ def play():
         print(f"  [=] Silos Grain:          {env.grain:,} bushels")
 
         if year % 4 == 0:
-            post_appr = (env.farmers_approval + env.workers_approval + env.elites_approval) / 3.0
+            post_appr = env.get_average_approval()
             print(f"\n  ============================================================")
             print(f"   ELECTION RESULTS: Approval = {post_appr:.1f}%")
             if post_appr >= 45.0:

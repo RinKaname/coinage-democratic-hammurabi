@@ -86,7 +86,7 @@ class DiscreteHammurabiEnv:
             "grain": float(self.env.grain),
             "land": float(self.env.land),
             "silver": float(self.env.silver),
-            "avg_approval": float((self.env.farmers_approval + self.env.workers_approval + self.env.elites_approval) / 3.0),
+            "avg_approval": float(self.env.get_average_approval()),
         }
         return norm_obs, info
 
@@ -138,7 +138,7 @@ class DiscreteHammurabiEnv:
         info["grain"] = float(self.env.grain)
         info["land"] = float(self.env.land)
         info["silver"] = float(self.env.silver)
-        info["avg_approval"] = float((self.env.farmers_approval + self.env.workers_approval + self.env.elites_approval) / 3.0)
+        info["avg_approval"] = float(self.env.get_average_approval())
 
         return norm_obs, step_reward, terminated, False, info
 
