@@ -251,13 +251,22 @@ class DemocraticHammurabi:
         else:
             self.workers_approval += 5
 
-        # Elites: Value monetary wealth; expect wealth to keep pace with population growth (Per-Capita Wealth standard)
-        total_wealth = self.silver + (self.land * self.land_price) + int(self.grain * self.grain_price)
-        expected_wealth = int((self.initial_wealth / max(1, self.initial_pop)) * self.population)
-        if total_wealth >= expected_wealth:
-            self.elites_approval += 5
-        else:
-            self.elites_approval -= 5
+        # Elites: Value monetary wealth and high estate values
+        # They love when land prices go up, and hate when the king runs a silver deficit
+        if hasattr(self, 'last_silver'):
+            if self.silver >= self.last_silver:
+                self.elites_approval += 3
+            else:
+                self.elites_approval -= 5
+
+        if hasattr(self, 'last_land_price'):
+            if self.land_price >= self.last_land_price:
+                self.elites_approval += 2
+            else:
+                self.elites_approval -= 2
+
+        self.last_silver = self.silver
+        self.last_land_price = self.land_price
 
         self.farmers_approval = self._clamp_and_decay_approval(self.farmers_approval)
         self.workers_approval = self._clamp_and_decay_approval(self.workers_approval)
