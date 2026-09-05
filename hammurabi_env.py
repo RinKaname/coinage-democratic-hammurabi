@@ -13,7 +13,7 @@ class DemocraticHammurabi:
 
     def reset(self):
         self.year = 1
-        self.population = 100
+        self.population = 300
         self.grain = 3000            # Bushels of food & seed in silos
         self.land = 1000             # Acres of farmable land
         self.silver = 30000           # Silver shekels in royal vault (rats cannot eat silver!)
