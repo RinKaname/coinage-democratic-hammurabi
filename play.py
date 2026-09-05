@@ -141,11 +141,12 @@ def play():
             grain_after_trade = grain
 
         # ----------------------------------------------------------------------
-        # Decision 3: Feed Citizens (from Silo Grain)
+        # Decision 3: Feed Workers (from Silo Grain)
         # ----------------------------------------------------------------------
-        needed_food = pop * 20
-        print(f"\n3. FEEDING CITIZENS (Silos available: {grain_after_trade:,} bushels)")
-        print(f"   Needed for 0 starvation: {needed_food:,} bushels (20 bu/person)")
+        worker_pop = pop - int(pop * 0.15) - int(pop * 0.35)
+        needed_food = worker_pop * 20
+        print(f"\n3. FEEDING WORKERS (Silos available: {grain_after_trade:,} bushels)")
+        print(f"   Workers to feed: {worker_pop:,} | Needed: {needed_food:,} bushels (20 bu/person)")
 
         default_feed = min(grain_after_trade, needed_food)
         while True:
@@ -171,12 +172,13 @@ def play():
         # ----------------------------------------------------------------------
         # Decision 4: Planting Seeds (from remaining grain)
         # ----------------------------------------------------------------------
+        farmer_pop = int(pop * 0.35)
         land_after_trade = land + acres_trade
-        max_workable = pop * 10
+        max_workable = farmer_pop * 10
         max_plantable = min(land_after_trade, max_workable, grain_after_food)
 
         print(f"\n4. PLANTING CROPS (Grain available: {grain_after_food:,} bushels)")
-        print(f"   1 bu/acre | Labor capacity: {max_workable:,} acres | Max plantable: {max_plantable:,} acres")
+        print(f"   1 bu/acre | Farmer capacity: {max_workable:,} acres | Max plantable: {max_plantable:,} acres")
 
         while True:
             plant_in = input(f"   Acres to plant [Enter = {max_plantable:,} max plant]: ").strip()
