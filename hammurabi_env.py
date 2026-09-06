@@ -215,7 +215,7 @@ class DemocraticHammurabi:
         # Deterministic: Rats appear if grain silos are very full (> 5000)
         rats_ate = 0
         if self.grain > 5000:
-            rats_ate = int(self.grain * 0.2) # Rats eat 20% of the hoard
+            rats_ate = int(self.grain * 0.02) # Rats eat 2% of the hoard (gentle storage tax)
             self.grain -= rats_ate
         self.last_rats_ate = rats_ate
 
