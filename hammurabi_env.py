@@ -170,8 +170,10 @@ class DemocraticHammurabi:
             starvation_rate = min(0.5, (self.grain_price - 2.0) * 0.1) # Up to 50% starve if price is 7.0
             civilians_starved = int((self.elite_pop + self.farmer_pop) * starvation_rate)
 
-        # Civilians eat their grain (if available)
-        self.civilian_grain = max(0, self.civilian_grain - civilian_food_demand)
+        # Only surviving civilians actually eat grain from the market
+        actual_civilian_eaters = (self.elite_pop + self.farmer_pop) - civilians_starved
+        actual_civilian_food_consumed = actual_civilian_eaters * 20
+        self.civilian_grain = max(0, self.civilian_grain - actual_civilian_food_consumed)
 
         starved = workers_starved + civilians_starved
         self.starved_total = starved
