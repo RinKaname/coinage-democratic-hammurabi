@@ -51,7 +51,7 @@ def play():
         f_appr = env.farmers_approval
         w_appr = env.workers_approval
         e_appr = env.elites_approval
-        avg_appr = env.get_average_approval()
+        avg_appr = (f_appr + w_appr + e_appr) / 3.0
         yrs_to_election = 4 - (year % 4) if (year % 4) != 0 else 0
 
         print(f"\n" + "-" * 70)
@@ -141,12 +141,11 @@ def play():
             grain_after_trade = grain
 
         # ----------------------------------------------------------------------
-        # Decision 3: Feed Workers (from Silo Grain)
+        # Decision 3: Feed Citizens (from Silo Grain)
         # ----------------------------------------------------------------------
-        worker_pop = pop - int(pop * 0.05) - int(pop * 0.80)
-        needed_food = worker_pop * 20
-        print(f"\n3. FEEDING WORKERS (Silos available: {grain_after_trade:,} bushels)")
-        print(f"   Workers to feed: {worker_pop:,} | Needed: {needed_food:,} bushels (20 bu/person)")
+        needed_food = pop * 20
+        print(f"\n3. FEEDING CITIZENS (Silos available: {grain_after_trade:,} bushels)")
+        print(f"   Needed for 0 starvation: {needed_food:,} bushels (20 bu/person)")
 
         default_feed = min(grain_after_trade, needed_food)
         while True:
@@ -172,13 +171,12 @@ def play():
         # ----------------------------------------------------------------------
         # Decision 4: Planting Seeds (from remaining grain)
         # ----------------------------------------------------------------------
-        farmer_pop = int(pop * 0.80)
         land_after_trade = land + acres_trade
-        max_workable = farmer_pop * 10
+        max_workable = pop * 10
         max_plantable = min(land_after_trade, max_workable, grain_after_food)
 
         print(f"\n4. PLANTING CROPS (Grain available: {grain_after_food:,} bushels)")
-        print(f"   1 bu/acre | Farmer capacity: {max_workable:,} acres | Max plantable: {max_plantable:,} acres")
+        print(f"   1 bu/acre | Labor capacity: {max_workable:,} acres | Max plantable: {max_plantable:,} acres")
 
         while True:
             plant_in = input(f"   Acres to plant [Enter = {max_plantable:,} max plant]: ").strip()
@@ -242,7 +240,7 @@ def play():
         print(f"  [=] Silos Grain:          {env.grain:,} bushels")
 
         if year % 4 == 0:
-            post_appr = env.get_average_approval()
+            post_appr = (env.farmers_approval + env.workers_approval + env.elites_approval) / 3.0
             print(f"\n  ============================================================")
             print(f"   ELECTION RESULTS: Approval = {post_appr:.1f}%")
             if post_appr >= 45.0:

@@ -30,17 +30,17 @@ FEED_MULTIPLIERS = [0.85, 1.0, 1.25]    # Rationing (85%), Maintain (100%), Feas
 PLANT_MULTIPLIERS = [0.5, 0.8, 1.0]     # Plant 50%, Plant 80%, Plant 100% full capacity
 
 NORM_FACTORS = np.array([
-    12.0,       # year (1..12)
-    1000.0,     # population (~100..1000)
-    10000.0,    # grain (~1000..10000)
-    5000.0,     # land (~500..5000)
-    100.0,      # land_price (10..100 silver/acre)
-    50000.0,    # silver (~30000..50000 shekels)
-    5.0,        # grain_price (~0.5..5.0 silver/bu)
-    100.0,      # farmers_approval (0..100)
-    100.0,      # workers_approval (0..100)
-    100.0,      # elites_approval (0..100)
-    4.0,        # years_until_election (0..3)
+    12.0,    # year (1..12)
+    100.0,   # population (~100..500)
+    1000.0,  # grain (~1000..10000)
+    1000.0,  # land (~500..2500)
+    25.0,    # land_price (20..30 silver/acre)
+    1000.0,  # silver (~500..10000 shekels)
+    1.0,     # grain_price (~0.7..2.0 silver/bu)
+    100.0,   # farmers_approval (0..100)
+    100.0,   # workers_approval (0..100)
+    100.0,   # elites_approval (0..100)
+    4.0,     # years_until_election (0..3)
 ], dtype=np.float32)
 
 
@@ -86,7 +86,7 @@ class DiscreteHammurabiEnv:
             "grain": float(self.env.grain),
             "land": float(self.env.land),
             "silver": float(self.env.silver),
-            "avg_approval": float(self.env.get_average_approval()),
+            "avg_approval": float((self.env.farmers_approval + self.env.workers_approval + self.env.elites_approval) / 3.0),
         }
         return norm_obs, info
 
@@ -109,17 +109,14 @@ class DiscreteHammurabiEnv:
         else:
             grain_after_trade = current_grain
 
-        # 2. Food allocation (Worker Only)
-        worker_pop = self.env.population - int(self.env.population * 0.05) - int(self.env.population * 0.80)
-        food_needed = worker_pop * 20
+        # 2. Food allocation
+        food_needed = self.env.population * 20
         target_food = min(grain_after_trade, food_needed * FEED_MULTIPLIERS[feed_idx])
         action_feed = target_food / max(1.0, grain_after_trade)
 
         # 3. Planting allocation (calculated on REMAINING grain after food!)
-        # Only farmers can plant
         grain_after_food = max(0.0, grain_after_trade - target_food)
-        farmer_pop = int(self.env.population * 0.80)
-        max_workable = farmer_pop * 10
+        max_workable = self.env.population * 10
         target_plant = min(float(self.env.land), float(max_workable)) * PLANT_MULTIPLIERS[plant_idx]
         action_plant = min(1.0, target_plant / max(1.0, grain_after_food))
 
@@ -138,7 +135,7 @@ class DiscreteHammurabiEnv:
         info["grain"] = float(self.env.grain)
         info["land"] = float(self.env.land)
         info["silver"] = float(self.env.silver)
-        info["avg_approval"] = float(self.env.get_average_approval())
+        info["avg_approval"] = float((self.env.farmers_approval + self.env.workers_approval + self.env.elites_approval) / 3.0)
 
         return norm_obs, step_reward, terminated, False, info
 

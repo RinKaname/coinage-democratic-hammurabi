@@ -14,14 +14,14 @@ class DemocraticHammurabi:
     def reset(self):
         self.year = 1
         self.population = 300
-        self.grain = 6000            # Bushels of food & seed in silos
-        self.land = 2500             # Acres of farmable land
-        self.silver = 30000           # Silver shekels in royal vault (rats cannot eat silver!)
+        self.grain = 6000             # Bushels of food & seed in royal silos
+        self.land = 2500              # Acres of farmable land
+        self.silver = 30000           # Silver shekels in royal vault
         self.elite_pop = int(self.population * 0.05)
         self.worker_pop = int(self.population * 0.15)
         self.farmer_pop = int(self.population * 0.80)
 
-        self.civilian_grain = 5000
+        self.civilian_grain = 5000    # Bushels in civilian silos
 
         self.update_demographics_and_prices()
         self.update_grain_price()
@@ -41,6 +41,8 @@ class DemocraticHammurabi:
         self.last_rats_ate = 0
         self.last_harvest_yield = 3
         self.last_immigrants = 0
+        self.last_silver = float(self.silver)
+        self.last_land_price = float(self.land_price)
 
         return self._get_state()
 
@@ -111,14 +113,12 @@ class DemocraticHammurabi:
         # ----------------------------------------------------------------------
         land_changed = 0
         if action_land < 0:
-            # Sell land for silver
             acres_to_sell = int(abs(action_land) * self.land)
             self.land -= acres_to_sell
             silver_earned = acres_to_sell * self.land_price
             self.silver += silver_earned
             land_changed = -acres_to_sell
         elif action_land > 0:
-            # Buy land using silver
             max_acres_affordable = int(self.silver // self.land_price)
             acres_to_buy = int(action_land * max_acres_affordable)
             self.land += acres_to_buy
@@ -126,18 +126,16 @@ class DemocraticHammurabi:
             land_changed = acres_to_buy
 
         # ----------------------------------------------------------------------
-        # 2. Grain Merchant Exchange (Buy/Sell Grain for Silver)
+        # 2. Merchant Grain Exchange (Buy/Sell Grain for Silver)
         # ----------------------------------------------------------------------
         grain_traded = 0
         if action_grain_trade < 0:
-            # Export / Sell surplus grain for silver
             bushels_to_sell = int(abs(action_grain_trade) * self.grain)
             self.grain -= bushels_to_sell
             silver_earned = int(bushels_to_sell * self.grain_price)
             self.silver += silver_earned
             grain_traded = -bushels_to_sell
         elif action_grain_trade > 0:
-            # Import / Buy emergency grain using silver
             max_grain_affordable = int(self.silver // self.grain_price)
             bushels_to_buy = int(action_grain_trade * max_grain_affordable)
             self.grain += bushels_to_buy
@@ -145,35 +143,43 @@ class DemocraticHammurabi:
             grain_traded = bushels_to_buy
 
         # ----------------------------------------------------------------------
-        # 3. Feed Workers (from Silo Grain)
+        # 3. Feeding Citizens (Workers & Civilians)
         # ----------------------------------------------------------------------
+        # Feeding state workers from royal grain
         grain_for_food = int(action_feed * self.grain)
         self.grain -= grain_for_food
 
         workers_fed = grain_for_food // 20
         workers_starved = max(0, self.worker_pop - workers_fed)
 
-        # Elites and Farmers feed themselves from civilian grain, but can starve if prices are too high
-        # We calculate the food demand for all non-workers and see if they survive
-        civilian_food_demand = (self.elite_pop + self.farmer_pop) * 20
+        # Update market grain price before civilian purchases occur
+        self.update_grain_price()
 
-        total_supply = float(self.grain + self.civilian_grain)
-        total_demand = float(self.population * 20)
+        # Civilian food requirements (Farmers + Elites)
+        total_civilians = self.elite_pop + self.farmer_pop
+        civilian_food_demand = total_civilians * 20
 
-        # Deterministic Grain Price based on overall supply vs demand
-        raw_grain_price = 1.0 * (total_demand / max(1.0, total_supply))
-        self.grain_price = float(max(0.5, min(5.0, raw_grain_price)))
+        # Civilians eat available civilian granary reserves first
+        grain_consumed = min(self.civilian_grain, civilian_food_demand)
+        self.civilian_grain -= grain_consumed
+        civilian_deficit = civilian_food_demand - grain_consumed
 
-        # If grain price is too high (> 2.0), civilian starvation occurs
         civilians_starved = 0
-        if self.grain_price > 2.0:
-            starvation_rate = min(0.5, (self.grain_price - 2.0) * 0.1) # Up to 50% starve if price is 7.0
-            civilians_starved = int((self.elite_pop + self.farmer_pop) * starvation_rate)
+        civilian_grain_bought = 0
 
-        # Only surviving civilians actually eat grain from the market
-        actual_civilian_eaters = (self.elite_pop + self.farmer_pop) - civilians_starved
-        actual_civilian_food_consumed = actual_civilian_eaters * 20
-        self.civilian_grain = max(0, self.civilian_grain - actual_civilian_food_consumed)
+        if civilian_deficit > 0:
+            # Purchasing power scales down if market price exceeds normal baseline (2.0 silver/bu)
+            affordability = min(1.0, 2.0 / self.grain_price)
+            affordable_bushels = int(civilian_deficit * affordability)
+
+            # Civilians purchase what they can afford from royal silos
+            civilian_grain_bought = min(affordable_bushels, self.grain)
+            self.grain -= civilian_grain_bought
+            self.silver += int(civilian_grain_bought * self.grain_price)
+
+            # Any remaining shortfall results directly in starvation (20 bu/person)
+            unmet_deficit = civilian_deficit - civilian_grain_bought
+            civilians_starved = min(total_civilians, unmet_deficit // 20)
 
         starved = workers_starved + civilians_starved
         self.starved_total = starved
@@ -199,25 +205,23 @@ class DemocraticHammurabi:
         # ----------------------------------------------------------------------
         # 5. Harvest & Rats
         # ----------------------------------------------------------------------
-        # Deterministic 4-year cycle (e.g., 3, 4, 2, 5)
         yield_cycle = [3, 4, 2, 5]
         yield_per_acre = yield_cycle[(self.year - 1) % 4]
         self.last_harvest_yield = yield_per_acre
 
         harvest = actual_planted * yield_per_acre
 
-        # 40% Tax goes to king (since King funds 100% of seeds and feeds 15% state workers)
+        # 40% Tax goes to king, 60% stays with civilian producers
         king_tax = int(harvest * 0.4)
         civilian_harvest = harvest - king_tax
 
         self.grain += king_tax
         self.civilian_grain += civilian_harvest
 
-        # Rats eat grain (Silver is 100% safe in vaults!)
-        # Deterministic: Rats appear if grain silos are very full (> 5000)
+        # Rats appear if royal grain silos hold > 5000 bushels
         rats_ate = 0
         if self.grain > 5000:
-            rats_ate = int(self.grain * 0.02) # Rats eat 2% of the hoard (gentle storage tax)
+            rats_ate = int(self.grain * 0.02)
             self.grain -= rats_ate
         self.last_rats_ate = rats_ate
 
@@ -226,9 +230,8 @@ class DemocraticHammurabi:
         # ----------------------------------------------------------------------
         immigrants = 0
         if starved == 0:
-            # Prosperity brings merchants and settlers
             wealth_factor = (20 * self.land + self.grain + self.silver) / (100 * self.population + 1)
-            immigrants = 5 + int(wealth_factor) # Deterministic immigrants
+            immigrants = 5 + int(wealth_factor)
             self.population += immigrants
             self.update_demographics_and_prices()
 
@@ -237,7 +240,6 @@ class DemocraticHammurabi:
         # ----------------------------------------------------------------------
         # 7. Faction Approval Updates
         # ----------------------------------------------------------------------
-        # Farmers: Love holding/buying land (+5), hate selling land (-10), love 100% planting (+5)
         if land_changed > 0:
             self.farmers_approval += 5
         elif land_changed < 0:
@@ -245,27 +247,22 @@ class DemocraticHammurabi:
         if actual_planted == self.land:
             self.farmers_approval += 5
         if civilians_starved > 0:
-             self.farmers_approval -= 20
+            self.farmers_approval -= 20
 
-        # Workers: Hate starvation, love low food prices and full bellies
         if workers_starved > 0:
             self.workers_approval -= (workers_starved / max(1, self.worker_pop)) * 100
         else:
             self.workers_approval += 5
 
-        # Elites: Value monetary wealth and high estate values
-        # They love when land prices go up, and hate when the king runs a silver deficit
-        if hasattr(self, 'last_silver'):
-            if self.silver >= self.last_silver:
-                self.elites_approval += 3
-            else:
-                self.elites_approval -= 5
+        if self.silver >= self.last_silver:
+            self.elites_approval += 3
+        else:
+            self.elites_approval -= 5
 
-        if hasattr(self, 'last_land_price'):
-            if self.land_price >= self.last_land_price:
-                self.elites_approval += 2
-            else:
-                self.elites_approval -= 2
+        if self.land_price >= self.last_land_price:
+            self.elites_approval += 2
+        else:
+            self.elites_approval -= 2
 
         self.last_silver = self.silver
         self.last_land_price = self.land_price
@@ -300,6 +297,13 @@ class DemocraticHammurabi:
             "harvest_yield": yield_per_acre,
             "rats_ate": rats_ate,
             "immigrants": immigrants,
+            "workers_starved": workers_starved,
+            "civilians_starved": civilians_starved,
+            "civilian_grain_bought": civilian_grain_bought,
+            "harvest_total": harvest,
+            "king_tax": king_tax,
+            "civilian_harvest": civilian_harvest,
+            "civilian_grain": self.civilian_grain,
         }
 
     def get_average_approval(self):
